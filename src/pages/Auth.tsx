@@ -325,6 +325,8 @@ const Auth = () => {
                 </svg>
                 Continue with Google
               </Button>
+              </>
+              )}
             </TabsContent>
           </Tabs>
 
