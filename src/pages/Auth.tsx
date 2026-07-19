@@ -28,6 +28,7 @@ const Auth = () => {
   const location = useLocation();
   const from = (location.state as { from?: string })?.from ?? "/dashboard";
 
+  const [method, setMethod] = useState<"username" | "phone">("username");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
