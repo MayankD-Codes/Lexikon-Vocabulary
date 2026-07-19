@@ -29,7 +29,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const ensureProfile = (userId: string | undefined) => {
       if (!userId) return;
-      void supabase.rpc("ensure_my_profile").then(({ error }) => {
+      void (supabase.rpc as unknown as (fn: string) => Promise<{ error: unknown }>)("ensure_my_profile").then(({ error }) => {
         if (error && import.meta.env.DEV) {
           // eslint-disable-next-line no-console
           console.error("[ensure_my_profile]", error);
