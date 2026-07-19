@@ -220,6 +220,7 @@ const Auth = () => {
               {method === "phone" ? (
                 <PhoneAuth mode={mode} />
               ) : (
+              <>
               <form onSubmit={handleSubmit} className="space-y-3">
                 <div>
                   <Label htmlFor="username">Username</Label>
