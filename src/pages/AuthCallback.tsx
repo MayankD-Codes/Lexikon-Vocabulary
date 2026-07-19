@@ -67,7 +67,7 @@ const AuthCallback = () => {
           routeUser(event);
         }
       });
-      timeout = window.setTimeout(() => {
+      timeout = setTimeout(() => {
         sub?.data.subscription.unsubscribe();
         sub = null;
         toast.error("Sign-in could not be completed. Please try again.");
