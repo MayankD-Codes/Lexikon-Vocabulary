@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
-import { BookOpen, User as UserIcon, Lock, ArrowRight, Eye, EyeOff, Check, X, Loader2 } from "lucide-react";
+import { BookOpen, User as UserIcon, Lock, ArrowRight, Eye, EyeOff, Check, X, Loader2, Phone } from "lucide-react";
+import PhoneAuth from "@/components/PhoneAuth";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
