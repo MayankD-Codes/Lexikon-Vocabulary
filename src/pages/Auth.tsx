@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, Navigate, useLocation } from "react-router-dom";
-import { BookOpen, User as UserIcon, Lock, ArrowRight, Eye, EyeOff, Check, X, Loader2 } from "lucide-react";
+import { BookOpen, User as UserIcon, Lock, ArrowRight, Eye, EyeOff, Check, X, Loader2, Phone } from "lucide-react";
+import PhoneAuth from "@/components/PhoneAuth";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -27,6 +28,7 @@ const Auth = () => {
   const location = useLocation();
   const from = (location.state as { from?: string })?.from ?? "/dashboard";
 
+  const [method, setMethod] = useState<"username" | "phone">("username");
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
@@ -188,12 +190,37 @@ const Auth = () => {
           </p>
 
           <Tabs value={mode} onValueChange={(v) => setMode(v as "signin" | "signup")}>
-            <TabsList className="grid grid-cols-2 w-full mb-5">
+            <TabsList className="grid grid-cols-2 w-full mb-4">
               <TabsTrigger value="signin">Sign in</TabsTrigger>
               <TabsTrigger value="signup">Sign up</TabsTrigger>
             </TabsList>
 
+            <div className="grid grid-cols-2 gap-2 mb-4 p-1 rounded-lg bg-muted">
+              <button
+                type="button"
+                onClick={() => setMethod("username")}
+                className={`flex items-center justify-center gap-1.5 h-9 rounded-md text-xs font-medium transition-colors ${
+                  method === "username" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <UserIcon className="h-3.5 w-3.5" /> Username
+              </button>
+              <button
+                type="button"
+                onClick={() => setMethod("phone")}
+                className={`flex items-center justify-center gap-1.5 h-9 rounded-md text-xs font-medium transition-colors ${
+                  method === "phone" ? "bg-background shadow-sm" : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                <Phone className="h-3.5 w-3.5" /> Phone
+              </button>
+            </div>
+
             <TabsContent value={mode} className="mt-0 space-y-4">
+              {method === "phone" ? (
+                <PhoneAuth mode={mode} />
+              ) : (
+              <>
               <form onSubmit={handleSubmit} className="space-y-3">
                 <div>
                   <Label htmlFor="username">Username</Label>
@@ -298,6 +325,8 @@ const Auth = () => {
                 </svg>
                 Continue with Google
               </Button>
+              </>
+              )}
             </TabsContent>
           </Tabs>
 
