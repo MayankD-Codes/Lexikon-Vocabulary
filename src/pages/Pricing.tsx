@@ -14,7 +14,7 @@ const Pricing = () => {
     <main className="min-h-screen bg-gradient-paper">
       <SEO
         title="Pricing — Lexikon Pro"
-        description="Lexikon is free for up to 10 saved words. Upgrade to Lexikon Pro for unlimited vocabulary — from $3.33/month billed yearly."
+        description="Lexikon is free for up to 2000 saved words. Upgrade to Lexikon Pro for unlimited vocabulary."
       />
       <header className="container py-6 flex items-center justify-between">
         <Link to="/" className="inline-flex items-center gap-2">
