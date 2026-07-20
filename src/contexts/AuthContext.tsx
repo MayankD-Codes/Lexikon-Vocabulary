@@ -29,12 +29,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const ensureProfile = (userId: string | undefined) => {
       if (!userId) return;
-      void supabase.rpc("ensure_my_profile").then(({ error }) => {
-        if (error && import.meta.env.DEV) {
-          // eslint-disable-next-line no-console
-          console.error("[ensure_my_profile]", error);
-        }
-      });
+      const username =
+        (user?.user_metadata?.username as string | undefined) ||
+        `user_${userId.slice(0, 8)}`;
+      const displayName =
+        (user?.user_metadata?.full_name as string | undefined) ||
+        (user?.user_metadata?.name as string | undefined) ||
+        username;
+      void supabase
+        .from("profiles")
+        .upsert(
+          {
+            user_id: userId,
+            username,
+            display_name: displayName,
+            avatar_url: (user?.user_metadata?.avatar_url as string | undefined) || null,
+          },
+          { onConflict: "user_id" },
+        )
+        .then(({ error }) => {
+          if (error && import.meta.env.DEV) {
+            // eslint-disable-next-line no-console
+            console.error("[ensureProfile]", error);
+          }
+        });
     };
 
     // 1) Register listener FIRST so we don't miss the initial event.
