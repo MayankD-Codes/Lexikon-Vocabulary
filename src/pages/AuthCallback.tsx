@@ -41,7 +41,7 @@ const AuthCallback = () => {
     }
 
     let sub: ReturnType<typeof supabase.auth.onAuthStateChange> | null = null;
-    let timeout: ReturnType<typeof window.setTimeout> | undefined;
+    let timeout: number | undefined;
 
     const finish = async () => {
       // Waits for client init, which includes PKCE code exchange when ?code= is present.
