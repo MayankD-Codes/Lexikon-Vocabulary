@@ -16,7 +16,7 @@ export interface PlanOption {
   durationDays: number;
 }
 
-export const FREE_WORD_LIMIT = 10;
+export const FREE_WORD_LIMIT = 2000;
 
 const trimLink = (value: string | undefined, fallback: string) => value?.trim() || fallback;
 
