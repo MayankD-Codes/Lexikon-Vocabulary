@@ -40,6 +40,27 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    setDeleting(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Session expired. Please sign in again.");
+      const { error } = await supabase.functions.invoke("delete-account", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (error) throw error;
+      toast.success("Your account has been deleted.");
+      await signOut();
+      navigate("/", { replace: true });
+    } catch (e) {
+      setDeleting(false);
+      toast.error(friendlyError(e, "Couldn't delete your account. Please contact support."));
+    }
+  };
 
   // SEO handled via <SEO /> below
 
