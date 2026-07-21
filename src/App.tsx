@@ -47,6 +47,9 @@ const App = () => (
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="/payment-cancelled" element={<PaymentCancelled />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/account-deletion" element={<AccountDeletion />} />
               <Route
                 element={
                   <ProtectedRoute>
