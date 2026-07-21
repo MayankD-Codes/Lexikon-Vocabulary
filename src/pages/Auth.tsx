@@ -232,7 +232,7 @@ const Auth = () => {
                         id="fullName"
                         type="text"
                         autoComplete="name"
-                        placeholder="Your name (shown on your profile)"
+                        placeholder="Your name)"
                         className="pl-9"
                         value={fullName}
                         onChange={(e) => setFullName(e.target.value.slice(0, 60))}
