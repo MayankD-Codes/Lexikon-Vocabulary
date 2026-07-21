@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { Camera, Loader2, User as UserIcon, Sparkles, ArrowRight } from "lucide-react";
+import { Camera, Loader2, User as UserIcon, Sparkles, ArrowRight, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import SEO from "@/components/SEO";
 import { friendlyError, friendlyStorageError } from "@/lib/friendlyError";
+import { isAndroidApp } from "@/lib/platform";
 
 const nameSchema = z
   .string()
@@ -23,7 +28,9 @@ const nameSchema = z
   .max(60, "Display name must be 60 characters or less");
 
 const Profile = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const androidApp = isAndroidApp();
   const { subscription, isPro, loading: subLoading } = useSubscription();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
