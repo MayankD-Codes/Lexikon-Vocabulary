@@ -26,6 +26,9 @@ import UserProfile from "./pages/UserProfile.tsx";
 import Pricing from "./pages/Pricing.tsx";
 import PaymentSuccess from "./pages/PaymentSuccess.tsx";
 import PaymentCancelled from "./pages/PaymentCancelled.tsx";
+import Privacy from "./pages/Privacy.tsx";
+import Terms from "./pages/Terms.tsx";
+import AccountDeletion from "./pages/AccountDeletion.tsx";
 
 const queryClient = new QueryClient();
 
