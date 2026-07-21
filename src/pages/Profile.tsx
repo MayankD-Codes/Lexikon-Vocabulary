@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { z } from "zod";
-import { Camera, Loader2, User as UserIcon, Sparkles, ArrowRight } from "lucide-react";
+import { Camera, Loader2, User as UserIcon, Sparkles, ArrowRight, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 
 import { Button } from "@/components/ui/button";
@@ -9,12 +9,17 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useSubscription } from "@/hooks/useSubscription";
 import SEO from "@/components/SEO";
 import { friendlyError, friendlyStorageError } from "@/lib/friendlyError";
+import { isAndroidApp } from "@/lib/platform";
 
 const nameSchema = z
   .string()
@@ -23,7 +28,9 @@ const nameSchema = z
   .max(60, "Display name must be 60 characters or less");
 
 const Profile = () => {
-  const { user } = useAuth();
+  const { user, signOut } = useAuth();
+  const navigate = useNavigate();
+  const androidApp = isAndroidApp();
   const { subscription, isPro, loading: subLoading } = useSubscription();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -33,6 +40,27 @@ const Profile = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const handleDeleteAccount = async () => {
+    if (!user) return;
+    setDeleting(true);
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData.session?.access_token;
+      if (!token) throw new Error("Session expired. Please sign in again.");
+      const { error } = await supabase.functions.invoke("delete-account", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (error) throw error;
+      toast.success("Your account has been deleted.");
+      await signOut();
+      navigate("/", { replace: true });
+    } catch (e) {
+      setDeleting(false);
+      toast.error(friendlyError(e, "Couldn't delete your account. Please contact support."));
+    }
+  };
 
   // SEO handled via <SEO /> below
 
@@ -270,24 +298,82 @@ const Profile = () => {
                 )}
                 {!isPro && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Up to 10 saved words. Upgrade for unlimited.
+                    Up to 2,000 saved words. Upgrade for unlimited.
                   </p>
                 )}
                 <p className="text-xs text-muted-foreground mt-2">
-                  Payments are currently handled through Instamojo payment links.
+                  {androidApp
+                    ? "Pro upgrades on Android are handled via Google Play Billing."
+                    : "Payments on the web are handled through Instamojo payment links."}
                 </p>
               </div>
-              <div className="flex gap-2">
-                <Button asChild size="sm" variant={isPro ? "outline" : "default"}>
-                  <Link to="/pricing">
-                    {isPro ? "Renew / change plan" : "Upgrade"} <ArrowRight className="h-4 w-4" />
-                  </Link>
-                </Button>
-              </div>
+              {!androidApp && (
+                <div className="flex gap-2">
+                  <Button asChild size="sm" variant={isPro ? "outline" : "default"}>
+                    <Link to="/pricing">
+                      {isPro ? "Renew / change plan" : "Upgrade"} <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </CardContent>
       </Card>
+
+      <Card className="mt-6 border-destructive/40">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg text-destructive">
+            <Trash2 className="h-4 w-4" /> Danger zone
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-start justify-between gap-4 flex-wrap">
+            <div className="max-w-md">
+              <p className="text-sm font-medium">Delete your account</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                Permanently delete your account and all associated data — words, quizzes,
+                Memory Palace, community messages, and subscription records. This action
+                cannot be undone.
+              </p>
+            </div>
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="destructive" size="sm" disabled={deleting}>
+                  {deleting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                  Delete account
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete your Lexikon account?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will immediately and permanently delete your account and all
+                    associated data. You cannot recover it afterwards.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteAccount}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Yes, delete my account
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        </CardContent>
+      </Card>
+
+      <p className="text-xs text-center text-muted-foreground mt-8">
+        <Link to="/privacy" className="hover:text-foreground underline-offset-4 hover:underline">Privacy Policy</Link>
+        {" · "}
+        <Link to="/terms" className="hover:text-foreground underline-offset-4 hover:underline">Terms of Service</Link>
+        {" · "}
+        <Link to="/account-deletion" className="hover:text-foreground underline-offset-4 hover:underline">Account Deletion</Link>
+      </p>
     </div>
   );
 };

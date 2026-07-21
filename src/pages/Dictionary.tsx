@@ -266,12 +266,26 @@ const Dictionary = () => {
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    let list = words.filter((w) =>
-      !q ||
-      w.word.toLowerCase().includes(q) ||
-      (w.meaning_english ?? "").toLowerCase().includes(q) ||
-      (w.meaning_hindi ?? "").toLowerCase().includes(q)
-    );
+    // Split into tokens so multi-word queries partial-match across fields
+    // (e.g. "run away" matches a word whose meaning contains both tokens).
+    const tokens = q ? q.split(/\s+/).filter(Boolean) : [];
+    let list = words.filter((w) => {
+      if (tokens.length === 0) return true;
+      const haystack = [
+        w.word,
+        w.meaning_english,
+        w.meaning_hindi,
+        w.synonyms,
+        w.antonyms,
+        w.example_sentence,
+        w.notes,
+        w.word_forms,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return tokens.every((t) => haystack.includes(t));
+    });
     list = [...list].sort((a, b) => {
       if (sort === "az") return a.word.localeCompare(b.word);
       if (sort === "oldest") return +new Date(a.created_at) - +new Date(b.created_at);

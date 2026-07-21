@@ -26,6 +26,9 @@ import UserProfile from "./pages/UserProfile.tsx";
 import Pricing from "./pages/Pricing.tsx";
 import PaymentSuccess from "./pages/PaymentSuccess.tsx";
 import PaymentCancelled from "./pages/PaymentCancelled.tsx";
+import Privacy from "./pages/Privacy.tsx";
+import Terms from "./pages/Terms.tsx";
+import AccountDeletion from "./pages/AccountDeletion.tsx";
 
 const queryClient = new QueryClient();
 
@@ -44,6 +47,9 @@ const App = () => (
               <Route path="/pricing" element={<Pricing />} />
               <Route path="/payment-success" element={<PaymentSuccess />} />
               <Route path="/payment-cancelled" element={<PaymentCancelled />} />
+              <Route path="/privacy" element={<Privacy />} />
+              <Route path="/terms" element={<Terms />} />
+              <Route path="/account-deletion" element={<AccountDeletion />} />
               <Route
                 element={
                   <ProtectedRoute>

@@ -29,6 +29,7 @@ const Auth = () => {
 
   const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [username, setUsername] = useState("");
+  const [fullName, setFullName] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -98,7 +99,12 @@ const Auth = () => {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { username: v.normalized } },
+        options: {
+          data: {
+            username: v.normalized,
+            full_name: fullName.trim() || v.normalized,
+          },
+        },
       });
       if (error) {
         const lower = (error.message || "").toLowerCase();
@@ -161,7 +167,7 @@ const Auth = () => {
     !busy &&
     username.trim().length > 0 &&
     password.length >= 8 &&
-    (mode === "signin" || (availability.state === "available" && passesAllChecks(password) && !passwordRejected));
+    (mode === "signin" || (availability.state === "available" && fullName.trim().length > 0 && passesAllChecks(password) && !passwordRejected));
 
   return (
     <div className="min-h-screen bg-gradient-paper flex flex-col">
@@ -217,6 +223,25 @@ const Auth = () => {
                   </div>
                   {renderAvailability()}
                 </div>
+                {mode === "signup" && (
+                  <div>
+                    <Label htmlFor="fullName">Full name</Label>
+                    <div className="relative">
+                      <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        id="fullName"
+                        type="text"
+                        autoComplete="name"
+                        placeholder="Your name (shown on your profile)"
+                        className="pl-9"
+                        value={fullName}
+                        onChange={(e) => setFullName(e.target.value.slice(0, 60))}
+                        maxLength={60}
+                        required
+                      />
+                    </div>
+                  </div>
+                )}
                 <div>
                   <Label htmlFor="password">Password</Label>
                   <div className="relative">
@@ -304,7 +329,10 @@ const Auth = () => {
 
 
           <p className="text-xs text-center text-muted-foreground mt-6">
-            By continuing, you agree to use Lexikon for personal vocabulary learning.
+            By continuing, you agree to our{" "}
+            <Link to="/terms" className="underline hover:text-foreground">Terms</Link>{" "}
+            and{" "}
+            <Link to="/privacy" className="underline hover:text-foreground">Privacy Policy</Link>.
           </p>
         </div>
       </main>
