@@ -5,10 +5,12 @@ import SEO from "@/components/SEO";
 import { PLAN_OPTIONS, PRO_FEATURES, FREE_WORD_LIMIT } from "@/lib/billing";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useAuth } from "@/contexts/AuthContext";
+import { isAndroidApp } from "@/lib/platform";
 
 const Pricing = () => {
   const { user } = useAuth();
   const { isPro, subscription, loading } = useSubscription();
+  const androidApp = isAndroidApp();
 
   return (
     <main className="min-h-screen bg-gradient-paper">
@@ -84,43 +86,58 @@ const Pricing = () => {
               </div>
             </div>
 
-            <div className="grid sm:grid-cols-3 gap-4 mt-6">
-              {PLAN_OPTIONS.map((p) => (
-                <div
-                  key={p.interval}
-                  className={
-                    "relative rounded-xl border p-4 flex flex-col " +
-                    (p.bestValue
-                      ? "border-primary/60 bg-primary/5"
-                      : "border-border/60 bg-background")
-                  }
-                >
-                  {p.bestValue && (
-                    <span className="absolute -top-2.5 right-3 rounded-full bg-primary text-primary-foreground text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5">
-                      Best value
-                    </span>
-                  )}
-                  <p className="text-sm font-medium">{p.label}</p>
-                  <div className="mt-2">
-                    <span className="font-display text-3xl font-semibold">{p.price}</span>
-                  </div>
-                  <p className="text-xs text-muted-foreground">{p.cadence}</p>
-                  {p.perMonth && (
-                    <p className="text-xs text-primary mt-1">{p.perMonth}</p>
-                  )}
-                  <Button asChild className="mt-4" variant={isPro ? "outline" : "default"}>
-                    <a href={p.paymentLink} target="_blank" rel="noopener noreferrer">
-                      {isPro ? `Renew — ${p.label}` : `Get ${p.label}`}
-                    </a>
-                  </Button>
+            {androidApp ? (
+              <div className="mt-6 rounded-xl border border-border/60 bg-background p-5 text-sm">
+                <p className="font-medium">Upgrade to Lexikon Pro from the web</p>
+                <p className="text-muted-foreground mt-1">
+                  To keep the Android app compliant with Google Play's Payments Policy,
+                  Pro upgrades are not sold inside this app. Please visit{" "}
+                  <span className="font-mono">lexikon-vocab.lovable.app/pricing</span> in
+                  your browser to subscribe. Your Pro status will sync back to this app
+                  automatically after signing in.
+                </p>
+              </div>
+            ) : (
+              <>
+                <div className="grid sm:grid-cols-3 gap-4 mt-6">
+                  {PLAN_OPTIONS.map((p) => (
+                    <div
+                      key={p.interval}
+                      className={
+                        "relative rounded-xl border p-4 flex flex-col " +
+                        (p.bestValue
+                          ? "border-primary/60 bg-primary/5"
+                          : "border-border/60 bg-background")
+                      }
+                    >
+                      {p.bestValue && (
+                        <span className="absolute -top-2.5 right-3 rounded-full bg-primary text-primary-foreground text-[10px] uppercase tracking-wide font-semibold px-2 py-0.5">
+                          Best value
+                        </span>
+                      )}
+                      <p className="text-sm font-medium">{p.label}</p>
+                      <div className="mt-2">
+                        <span className="font-display text-3xl font-semibold">{p.price}</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{p.cadence}</p>
+                      {p.perMonth && (
+                        <p className="text-xs text-primary mt-1">{p.perMonth}</p>
+                      )}
+                      <Button asChild className="mt-4" variant={isPro ? "outline" : "default"}>
+                        <a href={p.paymentLink} target="_blank" rel="noopener noreferrer">
+                          {isPro ? `Renew — ${p.label}` : `Get ${p.label}`}
+                        </a>
+                      </Button>
+                    </div>
+                  ))}
                 </div>
-              ))}
-            </div>
 
-            <p className="text-xs text-muted-foreground mt-4">
-              Payments are processed by Instamojo. Each payment grants Pro access for a fixed
-              duration (30 / 90 / 365 days). Not an auto-renewing subscription.
-            </p>
+                <p className="text-xs text-muted-foreground mt-4">
+                  Payments are processed by Instamojo. Each payment grants Pro access for a fixed
+                  duration (30 / 90 / 365 days). Not an auto-renewing subscription.
+                </p>
+              </>
+            )}
 
             <ul className="mt-6 grid sm:grid-cols-2 gap-y-2 gap-x-4 text-sm">
               {PRO_FEATURES.map((f) => (
