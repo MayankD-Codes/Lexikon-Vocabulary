@@ -1,11 +1,12 @@
-# Lexikon — Full Rebuild Spec
+# Lexikon
 
-Lexikon is a vocabulary-learning web app: users save English words, get AI-generated
-definitions/etymology/examples, run daily quizzes, build a Memory Palace, chat with
-"Lexi" (AI coach), compete on a leaderboard, and upgrade to Pro via Instamojo.
+Lexikon is a vocabulary-learning web app: users sign up with a unique **username + password**
+(Instagram-style), save English words, get AI-generated definitions/etymology/examples, capture
+words from photos with the camera, run daily quizzes, build a Memory Palace, chat with "Lexi"
+(AI coach), compete on a leaderboard, and upgrade to Pro via Instamojo.
 
-This README is the complete blueprint. Hand it to Lovable (or any dev) and the app
-can be rebuilt end-to-end.
+This README is the complete blueprint. Hand it to Lovable (or any dev) and the app can be
+rebuilt end-to-end.
 
 ---
 
@@ -15,10 +16,10 @@ can be rebuilt end-to-end.
 - **Backend:** Supabase (Postgres + Auth + Storage + Edge Functions in Deno)
 - **AI:** Google Gemini (`gemini-flash-latest`) via multi-key failover (`GEMINI_API_KEY`, `GEMINI_API_KEY_2..5`)
 - **Payments:** Instamojo one-time Payment Links (INR). Stripe scaffolding exists but is disabled in v1.
-- **Auth providers:** Email/password + Google OAuth
+- **Auth providers:** Username/password (primary, Instagram-style) + Google OAuth
 - **Hosting:** Vercel (frontend), Supabase (backend)
 
-Own Supabase project used by this build: `hwxyeutnuojfbamomkit.supabase.co`.
+Backend project used by this build: `hwxyeutnuojfbamomkit.supabase.co`.
 
 ---
 
@@ -42,7 +43,7 @@ VITE_INSTAMOJO_YEARLY_LINK=https://imjo.in/qQbXfY
 | `GEMINI_API_KEY`, `GEMINI_API_KEY_2..5` | Gemini API keys (rotated on quota/5xx) |
 | `SUPABASE_URL` | Auto-provided by Supabase |
 | `SUPABASE_ANON_KEY` | Auto-provided |
-| `SUPABASE_SERVICE_ROLE_KEY` | Auto-provided; used by webhook-style functions |
+| `SUPABASE_SERVICE_ROLE_KEY` | Auto-provided; used by webhook/delete-account functions |
 | `SUPABASE_JWKS` | Auto-provided (used by `getClaims`) |
 | `INSTAMOJO_API_KEY` | Only if you enable Instamojo webhook verification |
 | `INSTAMOJO_AUTH_TOKEN` | Same as above |
@@ -62,12 +63,15 @@ trigger `update_updated_at_column`).
 
 **`profiles`** — one row per user (created by `handle_new_user` trigger on `auth.users`)
 - `user_id uuid PK → auth.users`, `username citext UNIQUE`, `display_name text`, `avatar_url text`
+- The user's real email is **not** stored (privacy). Auth uses a synthetic email
+  `{username}@users.lexikon.app`.
 - RLS: users read/update own row; `SELECT` allowed via `get_profile_by_username` RPC for lookups.
 
 **`words`** — user's saved vocabulary
 - `id uuid`, `user_id uuid`, `word text`, `pronunciation`, `spelling`, `meaning_english`, `meaning_hindi`, `part_of_speech`, `word_forms`, `example_sentence`, `synonyms`, `antonyms`, `notes`, `source`
 - RLS: full CRUD scoped to `user_id = auth.uid()`.
-- **Free plan limit:** trigger `enforce_free_word_limit` (statement-level AFTER INSERT) blocks inserts once a free user has > 10 words. Pro bypasses via `is_user_pro(user_id)`.
+- **Free plan limit:** trigger `enforce_free_word_limit` (statement-level AFTER INSERT) blocks
+  inserts once a free user has **2,000 words**. Pro bypasses via `is_user_pro(user_id)`.
 
 **`word_stats`** — per-word quiz counters (`correct_count`, `incorrect_count`, `last_seen_at`, `streak`).
 
@@ -92,8 +96,8 @@ trigger `update_updated_at_column`).
 - `user_id`, `plan_interval`, `payment_id`, `amount`, `status` ('pending'|'approved'|'rejected'), `admin_notes`.
 - User inserts their own row; user/admin reads own; admin (service_role) approves.
 
-### Enums
-- `app_role` = `('admin','moderator','user')` (used with a `user_roles` table if you add admins).
+**`user_roles`** — `user_id`, `role app_role` ('admin'|'moderator'|'user'), unique per (user, role).
+Read via the security-definer `has_role()` function; never grant anon access.
 
 ### Security Definer Functions
 - `is_user_pro(uuid) → boolean` — used by trigger and UI.
@@ -111,35 +115,60 @@ trigger `update_updated_at_column`).
 
 ## 4. Authentication
 
-- **Providers:** Email/password + Google OAuth.
-- Google is configured in Supabase → Auth → Providers with Google Cloud OAuth Client ID/Secret. Authorized redirect URI = `https://hwxyeutnuojfbamomkit.supabase.co/auth/v1/callback`. Site URL and Additional Redirect URLs in Supabase must include your Vercel domain(s) and `http://localhost:8080`.
-- No anonymous sign-ups. Email confirmation ON.
-- On sign-in, frontend calls `supabase.auth.signInWithOAuth({provider:'google', options:{redirectTo: `${window.location.origin}/auth/callback`}})`.
-- `/auth/callback` page hydrates session then redirects to intended `next` param or `/dashboard`.
-- `AuthContext` (`src/contexts/AuthContext.tsx`) listens to `onAuthStateChange` and detects session expiry to toast the user.
-- `ProtectedRoute` gates all app routes; unauthenticated users bounce to `/auth`.
+### Username + password (primary, Instagram-style)
+- Signup collects **username, full name, password** (min 8 chars, HIBP leaked-password check).
+- Username availability is checked live via the `is_username_available` RPC.
+- Auth record uses the synthetic email `{username}@users.lexikon.app`; **email confirmation is
+  auto-confirm (OFF)** — synthetic emails can't receive mail and confirmation would burn the
+  hourly email quota.
+- The chosen full name is saved to user metadata and the `profiles.display_name` column at signup.
+- Public profile pages live at `/{username}` (`src/pages/UserProfile.tsx`).
 
-Password requirements: enable **HIBP leaked-password check** in Supabase Auth settings.
+### Google OAuth (secondary)
+- "Continue with Google" on `/auth` calls `supabase.auth.signInWithOAuth({provider:'google',
+  options:{redirectTo: `${window.location.origin}/auth/callback`}})` — direct Supabase OAuth,
+  **not** Lovable's managed `/~oauth/initiate` proxy (that only works on Lovable-hosted domains).
+- Google Cloud OAuth authorized redirect URI = `https://hwxyeutnuojfbamomkit.supabase.co/auth/v1/callback`.
+- Supabase Site URL and Additional Redirect URLs must include the Vercel domain(s) and `http://localhost:8080`.
+
+### Session management
+- `/auth/callback` hydrates the session (PKCE) then redirects to the intended `next` param or `/dashboard`.
+- `AuthContext` (`src/contexts/AuthContext.tsx`) listens to `onAuthStateChange`, restores sessions
+  with a loading state, and toasts on session expiry.
+- `ProtectedRoute` gates all app routes; unauthenticated users bounce to `/auth`.
 
 ---
 
 ## 5. Frontend Routes (`src/App.tsx`)
 
-Public: `/`, `/auth`, `/auth/callback`, `/reset-password`, `/pricing`, `/payment-success`, `/payment-cancelled`, `/u/:username`.
+Public: `/`, `/auth`, `/auth/callback`, `/reset-password`, `/pricing`, `/payment-success`,
+`/payment-cancelled`, `/privacy`, `/terms`, `/account-deletion`, `/:username`.
+
 Protected (inside `AppLayout` with sidebar):
 - `/dashboard` — stats + recent words
-- `/dictionary` — full word list, Excel/CSV import & export
-- `/add-word` — manual add + "Lexi Fill" (calls `lexi-fill-word`)
-- `/capture-word` — camera/upload → `lexi-scan-word` extracts words for bulk save
+- `/dictionary` — full word list; tokenized partial search across word/meanings/synonyms/antonyms/examples/notes; Excel/CSV import & export
+- `/add` — manual add + "Lexi Fill" (calls `lexi-fill-word`)
+- `/capture` — camera/upload → `lexi-scan-word` extracts candidate words; user selects multiple via chips and bulk-saves
 - `/word/:id` — detail + "Ask Lexi" (calls `lexi-explain-word`, streaming)
-- `/edit-word/:id`
+- `/word/:id/edit` — edit a word
 - `/quiz` — daily quiz, writes `quiz_sessions` + updates `word_stats`
 - `/memory-palace` — anchors/placements + imagery from `memory-palace-guide`
 - `/community` — chat wall
 - `/leaderboard` — `get_leaderboard()` RPC
-- `/profile` — profile edit, avatar upload to `avatars` bucket, subscription status
+- `/profile` — profile edit, avatar upload to `avatars` bucket, subscription status, danger zone (account deletion)
 
-Global: `LexiChat` floating widget on every protected page, calls `lexi-chat` (SSE).
+Legal/compliance: `/privacy`, `/terms`, `/account-deletion` (business details: Lexikon, Mumbai,
+Maharashtra, India — mr.lonsdaleite@outlook.com). Footer links appear on Auth and Profile.
+
+Global: `LexiChat` floating widget on every protected page, calls `lexi-chat` (SSE). A one-time
+`WelcomeTour` (localStorage-gated) runs for new users.
+
+### Android app / Google Play
+- `src/lib/platform.ts` detects the Android wrapper build (`?android=1` URL flag, persisted by `main.tsx`).
+- On Android, Instamojo payment links are hidden on Pricing/Profile — Play-Billing compliance
+  (purchases must flow through Google Play Billing in the wrapped app).
+- In-app self-service account deletion (Profile → Danger zone → `delete-account` edge function)
+  satisfies Google Play's account-deletion requirement.
 
 Design system: shadcn tokens in `src/index.css`; never hardcode colors. Dark/light via `ThemeProvider`.
 
@@ -148,12 +177,12 @@ Design system: shadcn tokens in `src/index.css`; never hardcode colors. Dark/lig
 ## 6. Business Logic
 
 ### Free vs Pro
-- **Free:** up to 10 saved words; all other features (quiz, palace, Lexi, community, leaderboard) work.
-- **Pro:** unlimited words + Excel/CSV import + Capture Word + Memory Palace imagery + unlimited Lexi.
+- **Free:** up to **2,000 saved words**; all other features (quiz, palace, Lexi, community, leaderboard) work.
+- **Pro:** unlimited words.
 
 Enforcement points:
-- DB trigger `enforce_free_word_limit` (last line of defense).
-- Frontend guard `src/lib/wordLimit.ts` used by `AddWord`, `CaptureWord` (bulk), `Dictionary` (import).
+- DB trigger `enforce_free_word_limit` (last line of defense, limit constant 2000).
+- Frontend guard `src/lib/wordLimit.ts` (imports `FREE_WORD_LIMIT` from `src/lib/billing.ts`), used by AddWord, CaptureWord (bulk), Dictionary (import).
 - `useSubscription()` hook returns `{ isPro, plan, status, periodEnd, ... }`.
 
 ### Payments (Instamojo v1)
@@ -177,7 +206,8 @@ Flow:
 
 ## 7. Edge Functions (Deno, in `supabase/functions/`)
 
-All import CORS headers, call `requireUser` from `_shared/auth.ts` for auth (except public webhooks), and use `_shared/gemini.ts` for multi-key Gemini failover with structured JSON output.
+All import CORS headers, call `requireUser` from `_shared/auth.ts` for auth (except public
+webhooks), and use `_shared/gemini.ts` for multi-key Gemini failover with structured JSON output.
 
 | Function | Purpose | Auth | Streaming |
 |---|---|---|---|
@@ -186,10 +216,14 @@ All import CORS headers, call `requireUser` from `_shared/auth.ts` for auth (exc
 | `lexi-fill-word` | Auto-fill dictionary entry (JSON schema) | required | no |
 | `lexi-scan-word` | Extract vocabulary words from a photo | required | no |
 | `memory-palace-guide` | Generate imagery text for word ↔ anchor | required | no |
+| `delete-account` | Permanently wipe user data + auth record (Google Play compliance) | required | no |
 | `create-checkout-session` | (Reserved) Stripe checkout | required | no |
 | `stripe-webhook` | (Reserved) Stripe webhook handler | `verify_jwt=false` | no |
 
 `supabase/config.toml` only overrides `verify_jwt` for `stripe-webhook`.
+
+Frontend never surfaces raw function errors: `src/lib/invokeFunction.ts` extracts friendly
+messages from JSON responses, and `src/lib/friendlyError.ts` maps error codes to human text.
 
 ---
 
@@ -201,11 +235,18 @@ src/
   contexts/AuthContext.tsx    # session + expiry toast
   components/AppLayout.tsx    # sidebar shell
   components/LexiChat.tsx     # floating AI chat
+  components/WelcomeTour.tsx  # one-time intro tour (localStorage)
   components/ProtectedRoute.tsx
+  components/PasswordStrength.tsx  # signup checklist + HIBP feedback
   hooks/useSubscription.ts    # Pro/Free state
-  lib/billing.ts              # plans + Instamojo links
+  lib/billing.ts              # plans, FREE_WORD_LIMIT, Instamojo links
   lib/wordLimit.ts            # free-plan guard
-  lib/lexi.ts                 # edge-function invokers
+  lib/username.ts             # username validation rules
+  lib/lexi.ts                 # edge-function invokers (sends user JWT)
+  lib/invokeFunction.ts       # friendly edge-function error extraction
+  lib/friendlyError.ts        # error-code → human message mapping
+  lib/siteUrl.ts              # centralized production URL handling
+  lib/platform.ts             # Android wrapper detection
   lib/quiz.ts                 # quiz builder
   integrations/supabase/{client.ts, types.ts}
   pages/… (see route list)
@@ -220,9 +261,9 @@ supabase/
 ## 9. Rebuild-From-Scratch Checklist
 
 1. Create Vite React TS project, install shadcn/ui, tailwind, react-router-dom, @supabase/supabase-js, @tanstack/react-query, sonner, lucide-react, xlsx, zod.
-2. Create Supabase project. Enable Google OAuth. Turn on HIBP password check. Set Site URL + redirect URLs.
+2. Create Supabase project. Enable Google OAuth. Turn on HIBP password check. Turn **off** email confirmation (username auth uses synthetic emails). Set Site URL + redirect URLs.
 3. Create `avatars` storage bucket (public) with RLS letting users write to `{user_id}/*`.
-4. Run all migrations in `supabase/migrations/` in order (via `supabase db push` from a linked CLI).
+4. Run all migrations in `supabase/migrations/` in order (via `supabase db push` from a linked CLI). Verify the `handle_new_user` trigger on `auth.users` exists afterwards.
 5. Set all Edge Function secrets (§2).
 6. Deploy edge functions (§10 below).
 7. Set frontend `.env` values (§2).
@@ -234,8 +275,7 @@ supabase/
 
 ## 10. How to Migrate Edge Functions & Secrets to Your Supabase
 
-You cannot pull from a Lovable-managed Supabase (no service-role or DB password
-exposed). Migrate **from this repo** into your own project instead.
+Migrate **from this repo** into your own project.
 
 ### Prereqs
 ```bash
@@ -259,9 +299,8 @@ migrations manually via SQL Editor, or use `supabase db diff` to reconcile.
 
 ### Deploy every edge function
 ```bash
-# one-shot deploy everything under supabase/functions/
 for fn in lexi-chat lexi-explain-word lexi-fill-word lexi-scan-word \
-          memory-palace-guide create-checkout-session stripe-webhook; do
+          memory-palace-guide delete-account create-checkout-session stripe-webhook; do
   supabase functions deploy "$fn" --project-ref hwxyeutnuojfbamomkit
 done
 ```
@@ -289,16 +328,6 @@ supabase secrets list --project-ref hwxyeutnuojfbamomkit   # verify
 `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, and
 `SUPABASE_JWKS` are auto-injected into every function — do not set them.
 
-### If you need to copy secrets *out of* the old Lovable-managed project
-Lovable Cloud does not expose secret **values** through any tool. You must:
-1. Open the third-party dashboards where they came from (Google AI Studio for
-   Gemini keys, Instamojo dashboard for its keys, Stripe dashboard for Stripe
-   keys) and copy the values from there.
-2. Paste them into `supabase secrets set` against your own project.
-
-If a key can't be retrieved from the origin service, rotate/create a new one
-there — cheaper than trying to extract it from Lovable.
-
 ### Verify
 ```bash
 # 1. Call a function with a valid user JWT (get one by logging into the app)
@@ -317,6 +346,10 @@ supabase functions logs lexi-fill-word --project-ref hwxyeutnuojfbamomkit
 
 - **Every new public table needs GRANTs** in the same migration (`authenticated`, plus `service_role`; `anon` only when policy allows). Without them PostgREST returns permission errors.
 - Don't hardcode colors — use design tokens in `src/index.css`.
-- Google OAuth `redirectTo` must be a full same-origin URL, not a protected route.
+- Google OAuth `redirectTo` must be a full same-origin URL, not a protected route. On non-Lovable
+  deployments, never use the `/~oauth/initiate` proxy — call `signInWithOAuth` directly.
+- Keep email confirmation **off**; the username system uses synthetic emails.
 - `handle_new_user` trigger lives on `auth.users`; verify it exists after restoring — it's created via a migration in this repo.
-- `enforce_free_word_limit` is a **statement-level** trigger using a `new_rows` transition table — needed so bulk inserts (imports) are counted atomically.
+- `enforce_free_word_limit` is a **statement-level** trigger using a `new_rows` transition table — needed so bulk inserts (imports) are counted atomically. Limit constant: 2000.
+- Edge-function AI calls use the `GEMINI_API_KEY*` secrets directly (Google Generative Language
+  API), not the Lovable AI Gateway — the `_shared/gemini.ts` helper handles multi-key failover.
